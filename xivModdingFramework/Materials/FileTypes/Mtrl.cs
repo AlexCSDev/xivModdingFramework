@@ -400,6 +400,23 @@ namespace xivModdingFramework.Materials.FileTypes
             var df = IOUtil.GetDataFileFromPath(mtrlPath);
             var mtrlData = await dat.GetType2Data(mtrlOffset, df);
 
+            return await GetMtrlDataFromBinary(mtrlData, mtrlPath, dxVersion, index, df);
+        }
+
+        /// <summary>
+        /// Gets the MTRL data for the given disk path and internal path
+        /// </summary>
+        /// <param name="diskPath">Path to the material file on disk</param>
+        /// <param name="mtrlPath">The full internal game path for the mtrl</param>
+        /// <returns>XivMtrl containing all the mtrl data</returns>
+        public async Task<XivMtrl> GetMtrlData(string diskPath, string mtrlPath, int dxVersion)
+        {
+            byte[] mtrlData = File.ReadAllBytes(diskPath);
+            return await GetMtrlDataFromBinary(mtrlData, mtrlPath, dxVersion);
+        }
+
+        private async Task<XivMtrl> GetMtrlDataFromBinary(byte[] mtrlData, string mtrlPath, int dxVersion, Index index = null, XivDataFile df = default)
+        {
             XivMtrl xivMtrl = null;
             try
             {
@@ -498,8 +515,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
                             if (String.IsNullOrEmpty(texturePath)) continue;
 
-                            if (await index.FileExists(Path.GetDirectoryName(texturePath).Replace("\\", "/") + "/" + dx11FileName,
-                                df))
+                            if (index != null && await index.FileExists(Path.GetDirectoryName(texturePath).Replace("\\", "/") + "/" + dx11FileName,
+                                df)) //todo: do this for FS as well?
                             {
                                 texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
                             }
@@ -568,7 +585,9 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             xivMtrl.TextureUsageList.Add(new TextureUsageStruct
                             {
-                                TextureType = br.ReadUInt32(), Unknown = br.ReadUInt32()});
+                                TextureType = br.ReadUInt32(),
+                                Unknown = br.ReadUInt32()
+                            });
                         }
 
                         xivMtrl.ShaderParameterList = new List<ShaderParameterStruct>(originalShaderParameterCount);
@@ -576,7 +595,9 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             xivMtrl.ShaderParameterList.Add(new ShaderParameterStruct
                             {
-                                ParameterID = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
+                                ParameterID = (MtrlShaderParameterId)br.ReadUInt32(),
+                                Offset = br.ReadInt16(),
+                                Size = br.ReadInt16()
                             });
                         }
 
@@ -601,13 +622,14 @@ namespace xivModdingFramework.Materials.FileTypes
                             shaderParam.Args = new List<float>();
                             if (bytesRead + size <= originalShaderParameterDataSize)
                             {
-                                for (var idx = offset; idx < offset + size; idx+=4)
+                                for (var idx = offset; idx < offset + size; idx += 4)
                                 {
                                     var arg = br.ReadSingle();
                                     shaderParam.Args.Add(arg);
                                     bytesRead += 4;
                                 }
-                            } else
+                            }
+                            else
                             {
                                 // Just use a blank array if we have missing/invalid shader data.
                                 shaderParam.Args = new List<float>(new float[size / 4]);
@@ -615,7 +637,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
 
                         // Chew through any remaining padding.
-                        while(bytesRead < originalShaderParameterDataSize)
+                        while (bytesRead < originalShaderParameterDataSize)
                         {
                             br.ReadByte();
                             bytesRead++;
@@ -975,7 +997,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="mtrlVariant">Which material variant folder.  Defaulted to 1.</param>
         /// <returns></returns>
-        public string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
+        public static string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
         {
             var mtrlFolder = "";
 
